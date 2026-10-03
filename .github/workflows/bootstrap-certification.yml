@@ -56,38 +56,32 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Locate certification package
-  shell: bash
-  run: |
-    set -euo pipefail
+        shell: bash
+        run: |
+          set -euo pipefail
 
-    ZIP="$(find . -maxdepth 1 -type f \
-      \( -name 'MemePugGioSs-AI-V85.9.12-RELEASE-GATE-HARDENED.zip' \
-      -o -name 'MemePugGioSs-AI-V85.9.13-BUILD-FIX.zip' \
-      -o -name 'MemePugGioSs-AI-V85.9.12-RELEASE-GATE-HARDENED-UPLOAD.zip' \) \
-      -print | sort | tail -n1)"
+          ZIP="$(find . -maxdepth 1 -type f \
+            \( -name 'MemePugGioSs-AI-V85.9.12-RELEASE-GATE-HARDENED.zip' \
+            -o -name 'MemePugGioSs-AI-V85.9.13-BUILD-FIX.zip' \
+            -o -name 'MemePugGioSs-AI-V85.9.12-RELEASE-GATE-HARDENED-UPLOAD.zip' \) \
+            -print | sort | tail -n1)"
 
-    test -n "$ZIP"
+          test -n "$ZIP"
 
-    echo "Using certification package: $ZIP"
+          echo "Using certification package: $ZIP"
 
-    rm -rf certification-source
-    mkdir -p certification-source
+          rm -rf certification-source
+          mkdir -p certification-source
 
-    unzip -q "$ZIP" -d certification-source
+          unzip -q "$ZIP" -d certification-source
 
-    PROJECT_DIR="$(dirname "$(find certification-source -mindepth 2 -maxdepth 2 -name package.json -print -quit)")"
-
-    test -n "$PROJECT_DIR"
-
-    echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-    echo "Certification project: $PROJECT_DIR"
-      
           PROJECT_DIR="$(dirname "$(find certification-source -mindepth 2 -maxdepth 2 -name package.json -print -quit)")"
-          test -n "$PROJECT_DIR"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Certification project: $PROJECT_DIR"
 
+          test -n "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Certification project: $PROJECT_DIR"
       - name: Install dependencies
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
