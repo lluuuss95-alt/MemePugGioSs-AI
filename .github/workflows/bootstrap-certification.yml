@@ -55,15 +55,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Locate certification package
+            - name: Locate certification package
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP="$(find . -maxdepth 1 -type f \
-            \( -name 'MemePugGioSs-AI-V85.9.12-RELEASE-GATE-HARDENED.zip' \
-            -o -name 'MemePugGioSs-AI-V85.9.13-BUILD-FIX.zip' \
-            -o -name 'MemePugGioSs-AI-V85.9.12-RELEASE-GATE-HARDENED-UPLOAD.zip' \) \
+          ZIP="$(find . -maxdepth 1 -type f -name 'MemePugGioSs-AI-*.zip' \
+            ! -name '*BACKUP*' \
             -print | sort | tail -n1)"
 
           test -n "$ZIP"
@@ -75,9 +73,11 @@ jobs:
 
           unzip -q "$ZIP" -d certification-source
 
-          PROJECT_DIR="$(dirname "$(find certification-source -mindepth 2 -maxdepth 2 -name package.json -print -quit)")"
+          PROJECT_DIR="$(find certification-source -name package.json -type f -print -quit)"
 
           test -n "$PROJECT_DIR"
+
+          PROJECT_DIR="$(dirname "$PROJECT_DIR")"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
