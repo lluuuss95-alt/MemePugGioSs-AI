@@ -1,0 +1,165 @@
+name: MemePugGioSs AI - Certification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: memepuggioss-certification
+  cancel-in-progress: false
+
+jobs:
+  certification:
+    name: Full Paper/Shadow Certification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Locate certification package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="$(find . -maxdepth 1 -type f -name 'MemePugGioSs-AI-V85.9.12-RELEASE-GATE-HARDENED.zip' -print -quit)"
+          test -n "$ZIP"
+          unzip -q "$ZIP" -d certification-source
+          PROJECT_DIR="$(dirname "$(find certification-source -mindepth 2 -maxdepth 2 -name package.json -print -quit)")"
+          test -n "$PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Certification project: $PROJECT_DIR"
+
+      - name: Install dependencies
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts
+          npm ci
+
+      - name: Environment preflight
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:environment-preflight
+
+      - name: Dependency validation
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:dependencies
+
+      - name: Source validation
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:build-source
+
+      - name: Test source validation
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:test-source
+
+      - name: Release environment validation
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:release-environment
+
+      - name: Reproducibility manifest
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:reproducibility
+
+      - name: Build backend
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run build
+
+      - name: Typecheck tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run typecheck:tests
+
+      - name: Paper safety validation
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:paper-shadow
+
+      - name: Paper E2E validation
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run e2e:paper
+
+      - name: Full test suite
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm test
+
+      - name: Runtime Paper certification
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:runtime-certification
+        env:
+          MEMEPUGGIOSS_MODE: PAPER
+          LIVE_EXECUTION_ENABLED: 'false'
+          SIGNING_ENABLED: 'false'
+          BROADCAST_ENABLED: 'false'
+          PRIVATE_KEY_ACCESS: 'false'
+          AUTO_PROMOTION: 'false'
+
+      - name: Android environment manifest
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:android-environment
+
+      - name: Android SDK/build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build Android APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon -p android-app assembleDebug
+
+      - name: Artifact provenance
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:provenance
+
+      - name: CI artifact certification
+        working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          CI_UPSTREAM_VALIDATED: 'true'
+        run: npm run validate:ci-artifacts
+
+      - name: Final release evidence attestation
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run validate:release-evidence
+
+      - name: Upload certification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MemePugGioSs-AI-V85.9.12-CERTIFICATION
+          path: |
+            ${{ env.PROJECT_DIR }}/dist/
+            ${{ env.PROJECT_DIR }}/android-app/app/build/outputs/apk/
+            ${{ env.PROJECT_DIR }}/*.json
+            ${{ env.PROJECT_DIR }}/FINAL-CERTIFICATION-REPORT.json
+            ${{ env.PROJECT_DIR }}/RUNTIME-CERTIFICATION-EXECUTION.json
+            ${{ env.PROJECT_DIR }}/CI-ARTIFACT-CERTIFICATION.json
+            ${{ env.PROJECT_DIR }}/ARTIFACT-PROVENANCE-MANIFEST.json
+            ${{ env.PROJECT_DIR }}/RELEASE-EVIDENCE-ATTESTATION.json
+          if-no-files-found: error
