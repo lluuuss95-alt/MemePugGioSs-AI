@@ -38,16 +38,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
           export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+
           test -d "$ANDROID_SDK_ROOT"
-          SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -path '*/bin/sdkmanager' -print | sort -V | tail -n1)"
+
+          SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" \
+            -type f \
+            -path '*/bin/sdkmanager' \
+            -print | sort -V | tail -n1)"
+
           test -n "$SDKMANAGER"
+
           SDKMANAGER_DIR="$(dirname "$SDKMANAGER")"
+
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "$SDKMANAGER_DIR" >> "$GITHUB_PATH"
           echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
           echo "Using sdkmanager: $SDKMANAGER"
           "$SDKMANAGER" --version
 
@@ -55,16 +65,23 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-            - name: Locate certification package
+
+      - name: Locate certification package
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP="$(find . -maxdepth 1 -type f -name 'MemePugGioSs-AI-*.zip' \
+          ZIP="$(find . -maxdepth 1 -type f \
+            -name 'MemePugGioSs-AI-*.zip' \
             ! -name '*BACKUP*' \
             -print | sort | tail -n1)"
 
-          test -n "$ZIP"
+          if [ -z "$ZIP" ]; then
+            echo "ERROR: No MemePugGioSs AI certification ZIP found."
+            echo "Repository root contents:"
+            find . -maxdepth 1 -type f -print
+            exit 1
+          fi
 
           echo "Using certification package: $ZIP"
 
@@ -73,15 +90,22 @@ jobs:
 
           unzip -q "$ZIP" -d certification-source
 
-          PROJECT_DIR="$(find certification-source -name package.json -type f -print -quit)"
+          PACKAGE_JSON="$(find certification-source \
+            -type f \
+            -name package.json \
+            -print -quit)"
 
-          test -n "$PROJECT_DIR"
+          if [ -z "$PACKAGE_JSON" ]; then
+            echo "ERROR: package.json not found inside certification ZIP."
+            find certification-source -maxdepth 3 -type f -print
+            exit 1
+          fi
 
-          PROJECT_DIR="$(dirname "$PROJECT_DIR")"
+          PROJECT_DIR="$(dirname "$PACKAGE_JSON")"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
           echo "Certification project: $PROJECT_DIR"
+
       - name: Install dependencies
         working-directory: ${{ env.PROJECT_DIR }}
         shell: bash
@@ -153,8 +177,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Build Android APK
         working-directory: ${{ env.PROJECT_DIR }}
