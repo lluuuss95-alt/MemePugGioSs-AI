@@ -208,7 +208,7 @@ jobs:
       - name: Upload certification artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MemePugGioSs-AI-V85.9.12-CERTIFICATION
+          name: MemePugGioSs-AI-V86.6.5-CERTIFICATION
           path: |
             ${{ env.PROJECT_DIR }}/dist/
             ${{ env.PROJECT_DIR }}/android-app/app/build/outputs/apk/
