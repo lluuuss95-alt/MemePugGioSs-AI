@@ -205,10 +205,59 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: npm run validate:release-evidence
 
+      - name: Reconcile final certification report with built APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+
+          const reportPath = 'FINAL-CERTIFICATION-REPORT.json';
+          const apkPath = 'android-app/app/build/outputs/apk/debug/app-debug.apk';
+          const metadataPath = 'android-app/app/build/outputs/apk/debug/output-metadata.json';
+
+          if (!fs.existsSync(apkPath)) throw new Error(`APK not found: ${apkPath}`);
+          if (!fs.existsSync(metadataPath)) throw new Error(`APK metadata not found: ${metadataPath}`);
+          if (!fs.existsSync(reportPath)) throw new Error(`Final report not found: ${reportPath}`);
+
+          const apk = fs.readFileSync(apkPath);
+          const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          const element = metadata.elements && metadata.elements[0];
+          if (!element || element.versionCode == null || !element.versionName) {
+            throw new Error('APK metadata does not contain versionCode/versionName');
+          }
+
+          const sha256 = crypto.createHash('sha256').update(apk).digest('hex');
+          report.certificationRequirements = {
+            ...(report.certificationRequirements || {}),
+            androidApk: true
+          };
+          report.androidBuildToolchain = 'CI global Gradle 8.9; this workflow builds without a Gradle wrapper';
+          report.androidApkEvidence = {
+            path: apkPath,
+            bytes: apk.length,
+            sha256,
+            versionCode: Number(element.versionCode),
+            versionName: element.versionName
+          };
+          report.reconciliation = {
+            status: 'PASS',
+            note: 'APK existence, metadata, size and SHA-256 recorded after all preceding certification steps passed.'
+          };
+          report.status = 'CERTIFIED_PAPER_SHADOW';
+          report.timestamp = new Date().toISOString();
+
+          fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
+          console.log(`APK verified: ${apk.length} bytes, SHA-256 ${sha256}`);
+          NODE
+
       - name: Upload certification artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MemePugGioSs-AI-V86.6.5-CERTIFICATION
+          name: MemePugGioSs-AI-PAPER-CERTIFICATION
           path: |
             ${{ env.PROJECT_DIR }}/dist/
             ${{ env.PROJECT_DIR }}/android-app/app/build/outputs/apk/
@@ -219,3 +268,4 @@ jobs:
             ${{ env.PROJECT_DIR }}/ARTIFACT-PROVENANCE-MANIFEST.json
             ${{ env.PROJECT_DIR }}/RELEASE-EVIDENCE-ATTESTATION.json
           if-no-files-found: error
+          
